@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { User, Phone, Mail, LogOut, Save, Shield } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { User, Phone, Mail, LogOut, Save, Shield, MapPin, Locate, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,9 @@ export default function Profile() {
   const [isVolunteer, setIsVolunteer] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [locationSharing, setLocationSharing] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [watchId, setWatchId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -25,10 +28,61 @@ export default function Profile() {
         setMobile(data.mobile || "");
         setIsVolunteer(data.is_volunteer || false);
       }
+      // Check if volunteer record exists with location
+      const { data: vol } = await supabase.from("volunteers").select("latitude, longitude").eq("user_id", user.id).single();
+      if (vol?.latitude && vol?.longitude) {
+        setCurrentLocation({ lat: vol.latitude, lng: vol.longitude });
+        setLocationSharing(true);
+      }
       setLoading(false);
     };
     fetchProfile();
   }, [user]);
+
+  const updateVolunteerLocation = useCallback(async (lat: number, lng: number) => {
+    if (!user) return;
+    setCurrentLocation({ lat, lng });
+    await supabase
+      .from("volunteers")
+      .update({ latitude: lat, longitude: lng })
+      .eq("user_id", user.id);
+  }, [user]);
+
+  const startLocationSharing = useCallback(() => {
+    if (!navigator.geolocation) {
+      toast({ title: "Error", description: "Geolocation not supported", variant: "destructive" });
+      return;
+    }
+
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        updateVolunteerLocation(pos.coords.latitude, pos.coords.longitude);
+      },
+      (err) => {
+        toast({ title: "Location error", description: err.message, variant: "destructive" });
+        setLocationSharing(false);
+      },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+    );
+    setWatchId(id);
+    setLocationSharing(true);
+    toast({ title: "📍 Location sharing active", description: "Your position is being shared with the network." });
+  }, [updateVolunteerLocation]);
+
+  const stopLocationSharing = useCallback(() => {
+    if (watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+      setWatchId(null);
+    }
+    setLocationSharing(false);
+    toast({ title: "Location sharing stopped" });
+  }, [watchId]);
+
+  useEffect(() => {
+    return () => {
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    };
+  }, [watchId]);
 
   const saveProfile = async () => {
     if (!user) return;
@@ -39,7 +93,6 @@ export default function Profile() {
       .eq("id", user.id);
 
     if (isVolunteer) {
-      // Upsert volunteer record
       const { data: existing } = await supabase.from("volunteers").select("id").eq("user_id", user.id).single();
       if (!existing) {
         await supabase.from("volunteers").insert({ user_id: user.id, role: "Volunteer" });
@@ -122,6 +175,59 @@ export default function Profile() {
           </div>
           <Switch checked={isVolunteer} onCheckedChange={setIsVolunteer} />
         </div>
+
+        {/* Location Sharing - only visible when volunteer */}
+        <AnimatePresence>
+          {isVolunteer && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="p-4 rounded-xl bg-card border border-border/50 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${locationSharing ? "bg-safe/10" : "bg-muted"}`}>
+                      <MapPin className={`h-5 w-5 ${locationSharing ? "text-safe" : "text-muted-foreground"}`} />
+                    </div>
+                    <div>
+                      <p className="font-medium text-foreground">Live Location Sharing</p>
+                      <p className="text-xs text-muted-foreground">
+                        {locationSharing ? "Broadcasting your position" : "Share your location with the network"}
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={locationSharing}
+                    onCheckedChange={(checked) => {
+                      if (checked) startLocationSharing();
+                      else stopLocationSharing();
+                    }}
+                  />
+                </div>
+
+                {currentLocation && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-safe/5 border border-safe/10"
+                  >
+                    <Locate className="h-4 w-4 text-safe" />
+                    <span className="text-xs text-muted-foreground">
+                      {currentLocation.lat.toFixed(5)}, {currentLocation.lng.toFixed(5)}
+                    </span>
+                    {locationSharing && (
+                      <span className="ml-auto flex items-center gap-1 text-xs text-safe">
+                        <CheckCircle className="h-3 w-3" /> Live
+                      </span>
+                    )}
+                  </motion.div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <Button onClick={saveProfile} className="w-full gap-2" disabled={saving}>
           <Save className="h-4 w-4" />
