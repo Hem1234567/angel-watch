@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
 import { useShakeDetection } from "@/hooks/use-shake-detection";
@@ -7,10 +8,37 @@ import { QuickContacts } from "@/components/QuickContacts";
 import { NotificationBell } from "@/components/NotificationBell";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ShieldCheck } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
   const { user } = useAuth();
+  const [profileName, setProfileName] = useState<string | null>(null);
   useShakeDetection();
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchName = async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("name")
+        .eq("id", user.id)
+        .single();
+      if (data?.name) setProfileName(data.name);
+    };
+    fetchName();
+
+    const channel = supabase
+      .channel("profile-name")
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${user.id}` }, (payload) => {
+        if (payload.new?.name) setProfileName(payload.new.name as string);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [user]);
+
+  const displayName = profileName || user?.user_metadata?.name || user?.email?.split("@")[0] || "there";
+
   const greeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good morning";
@@ -33,7 +61,7 @@ const Index = () => {
           <div>
             <h1 className="text-lg font-display font-bold text-foreground">Guardian Angel</h1>
             <p className="text-xs text-muted-foreground">
-              {greeting()}, {user?.user_metadata?.name || user?.email?.split("@")[0] || "there"}
+              {greeting()}, {displayName}
             </p>
           </div>
         </div>
