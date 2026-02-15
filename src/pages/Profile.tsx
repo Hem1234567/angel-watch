@@ -29,7 +29,8 @@ export default function Profile() {
         setIsVolunteer(data.is_volunteer || false);
       }
       // Check if volunteer record exists with location
-      const { data: vol } = await supabase.from("volunteers").select("latitude, longitude").eq("user_id", user.id).single();
+      const { data: volArr } = await supabase.from("volunteers").select("latitude, longitude").eq("user_id", user.id).limit(1);
+      const vol = volArr?.[0];
       if (vol?.latitude && vol?.longitude) {
         setCurrentLocation({ lat: vol.latitude, lng: vol.longitude });
         setLocationSharing(true);

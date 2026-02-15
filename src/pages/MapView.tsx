@@ -1,11 +1,11 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
-import { Navigation, ExternalLink } from "lucide-react";
+import { Navigation } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 
@@ -18,7 +18,7 @@ L.Icon.Default.mergeOptions({
 });
 
 const sosIcon = new L.DivIcon({
-  html: `<div style="width:24px;height:24px;border-radius:50%;background:#e53e3e;border:3px solid white;box-shadow:0 0 10px rgba(229,62,62,0.5);animation:pulse 2s infinite"></div>`,
+  html: `<div style="width:24px;height:24px;border-radius:50%;background:#e53e3e;border:3px solid white;box-shadow:0 0 10px rgba(229,62,62,0.5)"></div>`,
   className: "",
   iconSize: [24, 24],
   iconAnchor: [12, 12],
@@ -54,7 +54,7 @@ interface Volunteer {
   longitude: number;
   role: string;
   is_verified: boolean;
-  profiles?: { name: string | null } | null;
+  userName?: string;
 }
 
 interface SOSRequest {
@@ -63,7 +63,7 @@ interface SOSRequest {
   latitude: number;
   longitude: number;
   status: string;
-  profiles?: { name: string | null } | null;
+  userName?: string;
 }
 
 export default function MapView() {
@@ -75,11 +75,28 @@ export default function MapView() {
   useEffect(() => {
     const fetchData = async () => {
       const [{ data: vols }, { data: sos }] = await Promise.all([
-        supabase.from("volunteers").select("*, profiles:user_id(name)").eq("is_verified", true),
-        supabase.from("sos_requests").select("*, profiles:user_id(name)").eq("status", "pending"),
+        supabase.from("volunteers").select("*").eq("is_verified", true),
+        supabase.from("sos_requests").select("*").eq("status", "pending"),
       ]);
-      if (vols) setVolunteers(vols as unknown as Volunteer[]);
-      if (sos) setSosRequests(sos as unknown as SOSRequest[]);
+
+      // Fetch profile names
+      const allUserIds = [
+        ...(vols || []).map((v) => v.user_id),
+        ...(sos || []).map((s) => s.user_id),
+      ];
+      const uniqueIds = [...new Set(allUserIds)];
+      
+      let nameMap = new Map<string, string>();
+      if (uniqueIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, name")
+          .in("id", uniqueIds);
+        nameMap = new Map(profiles?.map((p) => [p.id, p.name || "Unknown"]) || []);
+      }
+
+      if (vols) setVolunteers(vols.map((v) => ({ ...v, userName: nameMap.get(v.user_id) || "Volunteer" })));
+      if (sos) setSosRequests(sos.map((s) => ({ ...s, userName: nameMap.get(s.user_id) || "Unknown" })));
     };
     fetchData();
 
@@ -155,7 +172,7 @@ export default function MapView() {
             v.latitude && v.longitude ? (
               <Marker key={v.id} position={[v.latitude, v.longitude]} icon={volunteerIcon}>
                 <Popup>
-                  <strong>{(v.profiles as any)?.name || "Volunteer"}</strong>
+                  <strong>{v.userName}</strong>
                   <br />
                   <span className="text-sm">{v.role}</span>
                 </Popup>
@@ -170,7 +187,7 @@ export default function MapView() {
                 <div className="space-y-2">
                   <strong className="text-sos">🚨 SOS Alert</strong>
                   <br />
-                  <span className="text-sm">From: {(s.profiles as any)?.name || "Unknown"}</span>
+                  <span className="text-sm">From: {s.userName}</span>
                   <br />
                   <Button size="sm" onClick={() => acceptSOS(s)} className="w-full mt-2 gap-1">
                     <Navigation className="h-3 w-3" /> Accept & Navigate
