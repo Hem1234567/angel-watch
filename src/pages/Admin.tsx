@@ -13,7 +13,8 @@ interface VolunteerRow {
   role: string;
   is_verified: boolean;
   created_at: string;
-  profiles?: { name: string | null; mobile: string | null } | null;
+  userName?: string;
+  userMobile?: string;
 }
 
 export default function Admin() {
@@ -33,9 +34,24 @@ export default function Admin() {
     const fetchVolunteers = async () => {
       const { data } = await supabase
         .from("volunteers")
-        .select("*, profiles:user_id(name, mobile)")
+        .select("*")
         .order("created_at", { ascending: false });
-      if (data) setVolunteers(data as unknown as VolunteerRow[]);
+      
+      if (data && data.length > 0) {
+        const userIds = data.map((v) => v.user_id);
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, name, mobile")
+          .in("id", userIds);
+        const nameMap = new Map(profiles?.map((p) => [p.id, { name: p.name, mobile: p.mobile }]) || []);
+        setVolunteers(data.map((v) => ({
+          ...v,
+          userName: nameMap.get(v.user_id)?.name || "Unknown",
+          userMobile: nameMap.get(v.user_id)?.mobile || "",
+        })));
+      } else {
+        setVolunteers([]);
+      }
       setFetching(false);
     };
     fetchVolunteers();
@@ -124,7 +140,7 @@ export default function Admin() {
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-foreground truncate">{(v.profiles as any)?.name || "Unknown"}</p>
+              <p className="font-medium text-foreground truncate">{v.userName}</p>
               <p className="text-sm text-muted-foreground">{v.role}</p>
             </div>
             <Switch checked={v.is_verified} onCheckedChange={() => toggleVerification(v)} />

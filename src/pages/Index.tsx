@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
+import { useShakeDetection } from "@/hooks/use-shake-detection";
 import { SOSButton } from "@/components/SOSButton";
 import { ActivityFeed } from "@/components/ActivityFeed";
 import { QuickContacts } from "@/components/QuickContacts";
@@ -9,6 +10,7 @@ import { ShieldCheck } from "lucide-react";
 
 const Index = () => {
   const { user } = useAuth();
+  useShakeDetection();
   const greeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "Good morning";

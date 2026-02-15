@@ -8,7 +8,8 @@ interface SOSEvent {
   id: string;
   status: string;
   created_at: string;
-  profiles?: { name: string | null } | null;
+  user_id: string;
+  userName?: string;
 }
 
 export function ActivityFeed() {
@@ -18,10 +19,20 @@ export function ActivityFeed() {
     const fetchEvents = async () => {
       const { data } = await supabase
         .from("sos_requests")
-        .select("id, status, created_at, profiles:user_id(name)")
+        .select("id, status, created_at, user_id")
         .order("created_at", { ascending: false })
         .limit(10);
-      if (data) setEvents(data as unknown as SOSEvent[]);
+      if (!data) return;
+
+      // Fetch profile names for all unique user_ids
+      const userIds = [...new Set(data.map((d) => d.user_id))];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, name")
+        .in("id", userIds);
+      
+      const nameMap = new Map(profiles?.map((p) => [p.id, p.name]) || []);
+      setEvents(data.map((d) => ({ ...d, userName: nameMap.get(d.user_id) || "Someone" })));
     };
     fetchEvents();
 
@@ -56,7 +67,6 @@ export function ActivityFeed() {
         {events.map((event, i) => {
           const config = statusConfig[event.status as keyof typeof statusConfig] || statusConfig.pending;
           const Icon = config.icon;
-          const profileName = (event.profiles as any)?.name || "Someone";
 
           return (
             <motion.div
@@ -72,7 +82,7 @@ export function ActivityFeed() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">
-                  {profileName} — <span className={config.color}>{config.label}</span>
+                  {event.userName} — <span className={config.color}>{config.label}</span>
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {formatDistanceToNow(new Date(event.created_at), { addSuffix: true })}
