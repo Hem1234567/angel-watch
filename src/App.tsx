@@ -57,11 +57,14 @@ function AppRoutes() {
   );
 }
 
+import { ReloadPrompt } from "./components/ReloadPrompt";
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <ReloadPrompt />
       <BrowserRouter>
         <AuthProvider>
           <AppRoutes />
