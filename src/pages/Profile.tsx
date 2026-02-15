@@ -1,6 +1,6 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { User, Phone, Mail, LogOut, Save, Shield, MapPin, Locate, CheckCircle } from "lucide-react";
+import { User, Phone, Mail, LogOut, Save, Shield, MapPin, Locate, CheckCircle, Camera } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,9 @@ export default function Profile() {
   const [locationSharing, setLocationSharing] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [watchId, setWatchId] = useState<number | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -27,6 +30,7 @@ export default function Profile() {
         setName(data.name || "");
         setMobile(data.mobile || "");
         setIsVolunteer(data.is_volunteer || false);
+        setAvatarUrl(data.avatar_url || null);
       }
       // Check if volunteer record exists with location
       const { data: volArr } = await supabase.from("volunteers").select("latitude, longitude").eq("user_id", user.id).limit(1);
@@ -85,6 +89,28 @@ export default function Profile() {
     };
   }, [watchId]);
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setUploadingAvatar(true);
+    const ext = file.name.split(".").pop();
+    const path = `${user.id}/avatar.${ext}`;
+    const { error } = await supabase.storage
+      .from("contact-avatars")
+      .upload(path, file, { upsert: true });
+    if (error) {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+      setUploadingAvatar(false);
+      return;
+    }
+    const { data } = supabase.storage.from("contact-avatars").getPublicUrl(path);
+    const url = `${data.publicUrl}?t=${Date.now()}`;
+    await supabase.from("profiles").update({ avatar_url: url }).eq("id", user.id);
+    setAvatarUrl(url);
+    setUploadingAvatar(false);
+    toast({ title: "Profile photo updated ✅" });
+  };
+
   const saveProfile = async () => {
     if (!user) return;
     setSaving(true);
@@ -134,10 +160,35 @@ export default function Profile() {
       >
         {/* Avatar */}
         <div className="flex justify-center">
-          <div className="w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center border-4 border-primary/20">
-            <User className="h-12 w-12 text-primary" />
-          </div>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="relative w-24 h-24 rounded-full bg-primary/10 flex items-center justify-center border-4 border-primary/20 overflow-hidden hover:border-primary transition-colors group"
+            disabled={uploadingAvatar}
+          >
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <User className="h-12 w-12 text-primary" />
+            )}
+            <div className="absolute inset-0 bg-foreground/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+              <Camera className="h-6 w-6 text-background" />
+            </div>
+            {uploadingAvatar && (
+              <div className="absolute inset-0 bg-foreground/50 flex items-center justify-center">
+                <div className="animate-spin w-6 h-6 border-2 border-background border-t-transparent rounded-full" />
+              </div>
+            )}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleAvatarUpload}
+          />
         </div>
+        <p className="text-xs text-muted-foreground text-center">Tap to change photo</p>
 
         {/* Email */}
         <div className="space-y-1">
