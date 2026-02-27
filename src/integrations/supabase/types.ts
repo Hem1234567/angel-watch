@@ -53,7 +53,9 @@ export type Database = {
           longitude: number
           status: string | null
           updated_at: string | null
+          user_confirmed: boolean | null
           user_id: string
+          volunteer_confirmed: boolean | null
         }
         Insert: {
           accepted_by?: string | null
@@ -63,7 +65,9 @@ export type Database = {
           longitude: number
           status?: string | null
           updated_at?: string | null
+          user_confirmed?: boolean | null
           user_id: string
+          volunteer_confirmed?: boolean | null
         }
         Update: {
           accepted_by?: string | null
@@ -73,7 +77,9 @@ export type Database = {
           longitude?: number
           status?: string | null
           updated_at?: string | null
+          user_confirmed?: boolean | null
           user_id?: string
+          volunteer_confirmed?: boolean | null
         }
         Relationships: []
       }
@@ -99,6 +105,7 @@ export type Database = {
         Row: {
           created_at: string | null
           id: string
+          incentive_score: number
           is_verified: boolean | null
           latitude: number | null
           longitude: number | null
@@ -109,6 +116,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           id?: string
+          incentive_score?: number
           is_verified?: boolean | null
           latitude?: number | null
           longitude?: number | null
@@ -119,6 +127,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           id?: string
+          incentive_score?: number
           is_verified?: boolean | null
           latitude?: number | null
           longitude?: number | null
