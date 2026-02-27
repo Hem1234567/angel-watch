@@ -9,6 +9,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { VolunteerAttendanceDialog } from "@/components/VolunteerAttendanceDialog";
 
 const Index = () => {
   const { user } = useAuth();
@@ -106,6 +107,9 @@ const Index = () => {
           <ActivityFeed />
         </motion.section>
       </div>
+
+      {/* Volunteer attendance confirmation dialog */}
+      <VolunteerAttendanceDialog />
     </div>
   );
 };

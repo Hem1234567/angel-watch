@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Phone, User, MapPin, Star, X, CheckCircle } from "lucide-react";
+import { motion } from "framer-motion";
+import { Phone, User, MapPin, Star, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";

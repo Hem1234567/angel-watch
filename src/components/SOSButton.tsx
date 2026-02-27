@@ -14,13 +14,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useNavigate } from "react-router-dom";
+import { NearbyVolunteers } from "@/components/NearbyVolunteers";
 
 export function SOSButton() {
   const { user } = useAuth();
   const [sending, setSending] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const navigate = useNavigate();
+  const [showVolunteers, setShowVolunteers] = useState(false);
+  const [sosId, setSosId] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const triggerSOS = async () => {
     if (!user || sending) return;
@@ -32,23 +34,29 @@ export function SOSButton() {
         navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
       );
 
-      const { error } = await supabase.from("sos_requests").insert({
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+
+      const { data, error } = await supabase.from("sos_requests").insert({
         user_id: user.id,
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
+        latitude: lat,
+        longitude: lng,
         status: "pending",
-      });
+      }).select("id").single();
 
       if (error) throw error;
 
+      setUserLocation({ lat, lng });
+      setSosId(data.id);
+
       toast({
         title: "🚨 SOS Sent!",
-        description: "Emergency alert has been broadcast. Help is on the way.",
+        description: "Finding nearby medical volunteers...",
         variant: "destructive",
       });
 
-      // Navigate to map to track the SOS
-      navigate("/map");
+      // Show nearby volunteers instead of navigating to map
+      setShowVolunteers(true);
     } catch (err: any) {
       toast({
         title: "Failed to send SOS",
@@ -94,6 +102,16 @@ export function SOSButton() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {userLocation && (
+        <NearbyVolunteers
+          sosId={sosId}
+          userLat={userLocation.lat}
+          userLng={userLocation.lng}
+          open={showVolunteers}
+          onClose={() => setShowVolunteers(false)}
+        />
+      )}
     </div>
   );
 }

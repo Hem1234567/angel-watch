@@ -149,6 +149,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_incentive_score: {
+        Args: { volunteer_user_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
