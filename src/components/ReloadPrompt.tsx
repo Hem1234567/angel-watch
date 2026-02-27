@@ -1,32 +1,31 @@
-import { useRegisterSW } from "virtual:pwa-register/react";
 import { toast } from "sonner";
 import { useEffect } from "react";
 
 export function ReloadPrompt() {
-    const {
-        needRefresh: [needRefresh, setNeedRefresh],
-        updateServiceWorker,
-    } = useRegisterSW({
-        onRegistered(r) {
-            console.log('SW Registered: ' + r)
+  useEffect(() => {
+    // @ts-ignore - virtual module provided by vite-plugin-pwa
+    import("virtual:pwa-register").then(({ registerSW }: any) => {
+      const updateSW = registerSW({
+        onNeedRefresh() {
+          toast("New content available, click on reload button to update.", {
+            action: {
+              label: "Reload",
+              onClick: () => updateSW(true),
+            },
+            duration: Infinity,
+          });
         },
-        onRegisterError(error) {
-            console.log('SW registration error', error)
-        }
+        onRegistered(r: any) {
+          console.log("SW Registered: " + r);
+        },
+        onRegisterError(error: any) {
+          console.log("SW registration error", error);
+        },
+      });
+    }).catch(() => {
+      // PWA registration not available
     });
+  }, []);
 
-    useEffect(() => {
-        if (needRefresh) {
-            toast("New content available, click on reload button to update.", {
-                action: {
-                    label: "Reload",
-                    onClick: () => updateServiceWorker(true),
-                },
-                duration: Infinity,
-                onDismiss: () => setNeedRefresh(false),
-            });
-        }
-    }, [needRefresh, updateServiceWorker, setNeedRefresh]);
-
-    return null;
+  return null;
 }
