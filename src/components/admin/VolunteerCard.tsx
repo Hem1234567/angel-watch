@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   CheckCircle, XCircle, ChevronDown, ChevronUp, Phone, Briefcase,
@@ -22,11 +22,11 @@ interface VolunteerCardProps {
   onToggleAdmin: (v: VolunteerRow) => void;
 }
 
-function DetailRow({ icon: Icon, label, value }: { icon: any; label: string; value: string | number | null | undefined }) {
+function DetailRow({ icon, label, value }: { icon: ReactNode; label: string; value: string | number | null | undefined }) {
   if (!value) return null;
   return (
     <div className="flex items-start gap-2 text-sm">
-      <Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+      <span className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0">{icon}</span>
       <div>
         <span className="text-muted-foreground">{label}: </span>
         <span className="text-foreground font-medium">{value}</span>
@@ -122,14 +122,14 @@ export function VolunteerCard({ v, i, isExpanded, onToggleExpand, onToggleVerifi
               ) : (
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <DetailRow icon={Phone} label="Phone" value={v.phone || v.userMobile} />
-                    <DetailRow icon={GraduationCap} label="Qualification" value={v.qualification} />
-                    <DetailRow icon={Stethoscope} label="Specialization" value={v.specialization} />
-                    <DetailRow icon={FileText} label="License No" value={v.license_no} />
-                    <DetailRow icon={Briefcase} label="Workplace" value={v.workplace} />
-                    <DetailRow icon={Clock} label="Experience" value={v.experience_years ? `${v.experience_years} years` : null} />
-                    <DetailRow icon={MapPin} label="Availability" value={v.availability} />
-                    <DetailRow icon={Award} label="Credits" value={v.incentive_score} />
+                    <DetailRow icon={<Phone className="h-4 w-4" />} label="Phone" value={v.phone || v.userMobile} />
+                    <DetailRow icon={<GraduationCap className="h-4 w-4" />} label="Qualification" value={v.qualification} />
+                    <DetailRow icon={<Stethoscope className="h-4 w-4" />} label="Specialization" value={v.specialization} />
+                    <DetailRow icon={<FileText className="h-4 w-4" />} label="License No" value={v.license_no} />
+                    <DetailRow icon={<Briefcase className="h-4 w-4" />} label="Workplace" value={v.workplace} />
+                    <DetailRow icon={<Clock className="h-4 w-4" />} label="Experience" value={v.experience_years ? `${v.experience_years} years` : null} />
+                    <DetailRow icon={<MapPin className="h-4 w-4" />} label="Availability" value={v.availability} />
+                    <DetailRow icon={<Award className="h-4 w-4" />} label="Credits" value={v.incentive_score} />
                   </div>
                   {v.about && (
                     <div className="text-sm">
