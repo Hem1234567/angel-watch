@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Shield, Users, UserCheck, Clock } from "lucide-react";
+import { Shield, Users, UserCheck, Clock, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { useNavigate } from "react-router-dom";
@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AdminStats } from "@/components/admin/AdminStats";
 import { VolunteerCard } from "@/components/admin/VolunteerCard";
 import { VolunteerRow } from "@/components/admin/types";
+import { SOSManagement } from "@/components/admin/SOSManagement";
 
 export default function Admin() {
   const { isAdmin, loading } = useAuth();
@@ -166,6 +167,9 @@ export default function Admin() {
           <TabsTrigger value="all" className="flex-1 gap-1">
             <Users className="h-3.5 w-3.5" /> All ({total})
           </TabsTrigger>
+          <TabsTrigger value="sos" className="flex-1 gap-1">
+            <AlertTriangle className="h-3.5 w-3.5" /> SOS
+          </TabsTrigger>
         </TabsList>
 
         {[
@@ -191,6 +195,10 @@ export default function Admin() {
               : <EmptyState message={empty} />}
           </TabsContent>
         ))}
+
+        <TabsContent value="sos">
+          <SOSManagement />
+        </TabsContent>
       </Tabs>
     </div>
   );

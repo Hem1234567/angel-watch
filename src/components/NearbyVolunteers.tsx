@@ -83,6 +83,15 @@ export function NearbyVolunteers({ sosId, userLat, userLng, open, onClose, onRes
 
   const fetchNearbyVolunteers = async () => {
     setLoading(true);
+
+    // Fetch configurable radius
+    const { data: settings } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "sos_radius_km")
+      .single();
+    const maxRadius = settings?.value ? parseInt(settings.value) : 50;
+
     const { data: vols } = await supabase
       .from("volunteers")
       .select("*")
@@ -121,6 +130,7 @@ export function NearbyVolunteers({ sosId, userLat, userLng, open, onClose, onRes
           distance: getDistanceKm(userLat, userLng, v.latitude!, v.longitude!),
         };
       })
+      .filter((v) => v.distance <= maxRadius)
       .sort((a, b) => a.distance - b.distance)
       .slice(0, 10);
 
