@@ -10,6 +10,7 @@ import { AdminStats } from "@/components/admin/AdminStats";
 import { VolunteerCard } from "@/components/admin/VolunteerCard";
 import { VolunteerRow } from "@/components/admin/types";
 import { SOSManagement } from "@/components/admin/SOSManagement";
+import { AllUsers } from "@/components/admin/AllUsers";
 
 export default function Admin() {
   const { isAdmin, loading } = useAuth();
@@ -175,7 +176,6 @@ export default function Admin() {
         {[
           { value: "pending", list: pendingVolunteers, empty: "No pending applications 🎉" },
           { value: "verified", list: verifiedVolunteers, empty: "No verified volunteers yet" },
-          { value: "all", list: volunteers, empty: "No volunteers registered yet" },
         ].map(({ value, list, empty }) => (
           <TabsContent key={value} value={value} className="space-y-2">
             {list.length > 0
@@ -195,6 +195,10 @@ export default function Admin() {
               : <EmptyState message={empty} />}
           </TabsContent>
         ))}
+
+        <TabsContent value="all">
+          <AllUsers />
+        </TabsContent>
 
         <TabsContent value="sos">
           <SOSManagement />
