@@ -18,6 +18,9 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 const VOLUNTEER_ROLES = [
   { value: "Doctor", label: "🩺 Doctor" },
+  { value: "Nurse", label: "👩‍⚕️ Nurse" },
+  { value: "Pharmacist", label: "💊 Pharmacist" },
+  { value: "Compounder", label: "🧪 Compounder" },
   { value: "Paramedic", label: "🚑 Paramedic" },
   { value: "First Aid", label: "🩹 First Aid" },
 ];
