@@ -103,37 +103,64 @@ export type Database = {
       }
       volunteers: {
         Row: {
+          about: string | null
+          availability: string | null
           created_at: string | null
+          experience_years: number | null
+          full_name: string | null
           id: string
           incentive_score: number
           is_verified: boolean | null
           latitude: number | null
+          license_no: string | null
           longitude: number | null
+          phone: string | null
+          qualification: string | null
           role: string | null
+          specialization: string | null
           updated_at: string | null
           user_id: string
+          workplace: string | null
         }
         Insert: {
+          about?: string | null
+          availability?: string | null
           created_at?: string | null
+          experience_years?: number | null
+          full_name?: string | null
           id?: string
           incentive_score?: number
           is_verified?: boolean | null
           latitude?: number | null
+          license_no?: string | null
           longitude?: number | null
+          phone?: string | null
+          qualification?: string | null
           role?: string | null
+          specialization?: string | null
           updated_at?: string | null
           user_id: string
+          workplace?: string | null
         }
         Update: {
+          about?: string | null
+          availability?: string | null
           created_at?: string | null
+          experience_years?: number | null
+          full_name?: string | null
           id?: string
           incentive_score?: number
           is_verified?: boolean | null
           latitude?: number | null
+          license_no?: string | null
           longitude?: number | null
+          phone?: string | null
+          qualification?: string | null
           role?: string | null
+          specialization?: string | null
           updated_at?: string | null
           user_id?: string
+          workplace?: string | null
         }
         Relationships: []
       }
