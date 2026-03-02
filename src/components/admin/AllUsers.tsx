@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { User, Shield, UserCheck, Phone } from "lucide-react";
+import { User, Shield, UserCheck, Phone, ShieldCheck, ShieldOff } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
 
 interface UserProfile {
   id: string;
@@ -21,37 +23,62 @@ export function AllUsers() {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchAllUsers = async () => {
-      const [{ data: profiles }, { data: roles }, { data: volunteers }] = await Promise.all([
-        supabase.from("profiles").select("*").order("created_at", { ascending: false }),
-        supabase.from("user_roles").select("user_id, role").eq("role", "admin"),
-        supabase.from("volunteers").select("user_id, role, is_verified"),
-      ]);
+  const fetchAllUsers = async () => {
+    const [{ data: profiles }, { data: roles }, { data: volunteers }] = await Promise.all([
+      supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+      supabase.from("user_roles").select("user_id, role").eq("role", "admin"),
+      supabase.from("volunteers").select("user_id, role, is_verified"),
+    ]);
 
-      const adminSet = new Set(roles?.map((r) => r.user_id) || []);
-      const volunteerMap = new Map(
-        volunteers?.map((v) => [v.user_id, { role: v.role, is_verified: v.is_verified }]) || []
-      );
+    const adminSet = new Set(roles?.map((r) => r.user_id) || []);
+    const volunteerMap = new Map(
+      volunteers?.map((v) => [v.user_id, { role: v.role, is_verified: v.is_verified }]) || []
+    );
 
-      setUsers(
-        (profiles || []).map((p) => ({
-          id: p.id,
-          name: p.name,
-          mobile: p.mobile,
-          avatar_url: p.avatar_url,
-          is_volunteer: p.is_volunteer,
-          created_at: p.created_at,
-          isAdmin: adminSet.has(p.id),
-          isVolunteer: volunteerMap.has(p.id),
-          volunteerRole: volunteerMap.get(p.id)?.role || null,
-          isVerified: volunteerMap.get(p.id)?.is_verified || false,
-        }))
-      );
-      setLoading(false);
-    };
-    fetchAllUsers();
-  }, []);
+    setUsers(
+      (profiles || []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        mobile: p.mobile,
+        avatar_url: p.avatar_url,
+        is_volunteer: p.is_volunteer,
+        created_at: p.created_at,
+        isAdmin: adminSet.has(p.id),
+        isVolunteer: volunteerMap.has(p.id),
+        volunteerRole: volunteerMap.get(p.id)?.role || null,
+        isVerified: volunteerMap.get(p.id)?.is_verified || false,
+      }))
+    );
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchAllUsers(); }, []);
+
+  const toggleAdmin = async (user: UserProfile) => {
+    if (user.isAdmin) {
+      const { error } = await supabase
+        .from("user_roles")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("role", "admin");
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      } else {
+        setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, isAdmin: false } : u));
+        toast({ title: "Admin role removed" });
+      }
+    } else {
+      const { error } = await supabase
+        .from("user_roles")
+        .insert({ user_id: user.id, role: "admin" });
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      } else {
+        setUsers((prev) => prev.map((u) => u.id === user.id ? { ...u, isAdmin: true } : u));
+        toast({ title: "User promoted to admin 🛡️" });
+      }
+    }
+  };
 
   if (loading) {
     return (
@@ -109,14 +136,26 @@ export function AllUsers() {
               )}
             </div>
           </div>
-          <div className="text-right shrink-0">
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <Button
+              size="sm"
+              variant={user.isAdmin ? "destructive" : "outline"}
+              className="gap-1 text-xs"
+              onClick={() => toggleAdmin(user)}
+            >
+              {user.isAdmin ? (
+                <><ShieldOff className="h-3 w-3" /> Remove Admin</>
+              ) : (
+                <><ShieldCheck className="h-3 w-3" /> Make Admin</>
+              )}
+            </Button>
             {user.mobile && (
               <a href={`tel:${user.mobile}`} className="text-xs text-muted-foreground flex items-center gap-1">
                 <Phone className="h-3 w-3" /> {user.mobile}
               </a>
             )}
             {user.created_at && (
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground">
                 {new Date(user.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
               </p>
             )}
