@@ -104,7 +104,7 @@ export function NearbyVolunteers({ sosId, userLat, userLng, open, onClose, onRes
 
     const profileMap = new Map(profiles?.map((p) => [p.id, p]) || []);
 
-    const MAX_RADIUS_KM = 5; // Only show volunteers within 5km radius
+    const MAX_RADIUS_KM = 50; // Show volunteers within 50km radius
 
     const nearby = vols
       .filter((v) => v.latitude && v.longitude && v.user_id !== user?.id)
@@ -117,13 +117,13 @@ export function NearbyVolunteers({ sosId, userLat, userLng, open, onClose, onRes
           longitude: v.longitude!,
           role: v.role || "Volunteer",
           incentive_score: (v as any).incentive_score || 0,
-          name: profile?.name || "Volunteer",
-          mobile: profile?.mobile || "",
+          name: v.full_name || profile?.name || "Volunteer",
+          mobile: v.phone || profile?.mobile || "",
           avatar_url: profile?.avatar_url || null,
           distance: getDistanceKm(userLat, userLng, v.latitude!, v.longitude!),
         };
       })
-      .filter((v) => v.distance <= MAX_RADIUS_KM) // Filter within radius
+      .filter((v) => v.distance <= MAX_RADIUS_KM)
       .sort((a, b) => a.distance - b.distance)
       .slice(0, 10);
 
@@ -161,7 +161,7 @@ export function NearbyVolunteers({ sosId, userLat, userLng, open, onClose, onRes
               🚨 Nearby Medical Volunteers
             </DialogTitle>
             <DialogDescription>
-              Medical volunteers within 5 km are listed below. Tap to call them directly. Your live location is being shared.
+              Medical volunteers sorted by distance are listed below. Tap to call them directly. Your live location is being shared.
             </DialogDescription>
           </DialogHeader>
 
