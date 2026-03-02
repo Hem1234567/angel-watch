@@ -64,6 +64,17 @@ interface SOSRequest {
   longitude: number;
   status: string;
   userName?: string;
+  distanceKm?: number;
+}
+
+function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 export default function MapView() {
@@ -71,21 +82,32 @@ export default function MapView() {
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
   const [sosRequests, setSosRequests] = useState<SOSRequest[]>([]);
   const [filter, setFilter] = useState<"all" | "volunteers" | "sos">("all");
+  const [myVolunteerLocation, setMyVolunteerLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
-      const [{ data: vols }, { data: sos }] = await Promise.all([
+      const ownVolunteerPromise = user
+        ? supabase.from("volunteers").select("latitude, longitude").eq("user_id", user.id).limit(1)
+        : Promise.resolve({ data: null });
+
+      const [{ data: vols }, { data: sos }, ownVolunteerResult] = await Promise.all([
         supabase.from("volunteers").select("*").eq("is_verified", true),
         supabase.from("sos_requests").select("*").eq("status", "pending"),
+        ownVolunteerPromise,
       ]);
 
-      // Fetch profile names
+      const ownVolunteer = Array.isArray(ownVolunteerResult.data) ? ownVolunteerResult.data[0] : null;
+      const myLocation = ownVolunteer && ownVolunteer.latitude !== null && ownVolunteer.longitude !== null
+        ? { lat: ownVolunteer.latitude, lng: ownVolunteer.longitude }
+        : null;
+      setMyVolunteerLocation(myLocation);
+
       const allUserIds = [
         ...(vols || []).map((v) => v.user_id),
         ...(sos || []).map((s) => s.user_id),
       ];
       const uniqueIds = [...new Set(allUserIds)];
-      
+
       let nameMap = new Map<string, string>();
       if (uniqueIds.length > 0) {
         const { data: profiles } = await supabase
@@ -95,9 +117,34 @@ export default function MapView() {
         nameMap = new Map(profiles?.map((p) => [p.id, p.name || "Unknown"]) || []);
       }
 
-      if (vols) setVolunteers(vols.map((v) => ({ ...v, userName: nameMap.get(v.user_id) || "Volunteer" })));
-      if (sos) setSosRequests(sos.map((s) => ({ ...s, userName: nameMap.get(s.user_id) || "Unknown" })));
+      if (vols) {
+        setVolunteers(vols.map((v) => ({ ...v, userName: nameMap.get(v.user_id) || "Volunteer" })));
+      }
+
+      if (sos) {
+        const sortedSOS = sos
+          .map((s) => {
+            const distanceKm = myLocation
+              ? getDistanceKm(myLocation.lat, myLocation.lng, s.latitude, s.longitude)
+              : undefined;
+            return {
+              ...s,
+              userName: nameMap.get(s.user_id) || "Unknown",
+              distanceKm,
+            };
+          })
+          .sort((a, b) => {
+            if (a.distanceKm === undefined && b.distanceKm === undefined) return 0;
+            if (a.distanceKm === undefined) return 1;
+            if (b.distanceKm === undefined) return -1;
+            return a.distanceKm - b.distanceKm;
+          });
+
+        const nearby = sortedSOS.filter((s) => s.distanceKm !== undefined && s.distanceKm <= 50);
+        setSosRequests(nearby.length > 0 ? nearby : sortedSOS);
+      }
     };
+
     fetchData();
 
     const channel = supabase
@@ -106,24 +153,75 @@ export default function MapView() {
       .on("postgres_changes", { event: "*", schema: "public", table: "sos_requests" }, () => fetchData())
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
-  }, []);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || !navigator.geolocation) return;
+
+    let watchId: number | null = null;
+    let cancelled = false;
+
+    const startTracking = async () => {
+      const { data: ownVolunteer } = await supabase
+        .from("volunteers")
+        .select("id")
+        .eq("user_id", user.id)
+        .limit(1);
+
+      if (cancelled || !ownVolunteer || ownVolunteer.length === 0) return;
+
+      watchId = navigator.geolocation.watchPosition(
+        ({ coords }) => {
+          const lat = coords.latitude;
+          const lng = coords.longitude;
+          setMyVolunteerLocation({ lat, lng });
+          supabase
+            .from("volunteers")
+            .update({ latitude: lat, longitude: lng })
+            .eq("user_id", user.id);
+        },
+        () => {},
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+      );
+    };
+
+    startTracking();
+
+    return () => {
+      cancelled = true;
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    };
+  }, [user]);
 
   const acceptSOS = async (sos: SOSRequest) => {
     if (!user) return;
-    const { error } = await supabase
+
+    const { data, error } = await supabase
       .from("sos_requests")
       .update({ status: "accepted", accepted_by: user.id })
-      .eq("id", sos.id);
+      .eq("id", sos.id)
+      .eq("status", "pending")
+      .select("id")
+      .maybeSingle();
+
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "✅ Accepted", description: "Opening navigation..." });
-      window.open(
-        `https://www.google.com/maps/dir/?api=1&destination=${sos.latitude},${sos.longitude}&travelmode=driving`,
-        "_blank"
-      );
+      return;
     }
+
+    if (!data) {
+      toast({ title: "Already accepted", description: "This SOS has already been taken." });
+      return;
+    }
+
+    toast({ title: "✅ Accepted", description: "Opening navigation..." });
+    window.open(
+      `https://www.google.com/maps/dir/?api=1&destination=${sos.latitude},${sos.longitude}&travelmode=driving`,
+      "_blank"
+    );
   };
 
   const filters = [
@@ -155,6 +253,12 @@ export default function MapView() {
         ))}
       </motion.div>
 
+      {myVolunteerLocation && (
+        <div className="absolute top-16 left-4 z-[1000] px-3 py-1.5 rounded-full bg-card border border-border text-xs text-muted-foreground">
+          Showing nearest SOS first (within 50 km if available)
+        </div>
+      )}
+
       <MapContainer
         center={[20, 78]}
         zoom={5}
@@ -169,7 +273,7 @@ export default function MapView() {
 
         {(filter === "all" || filter === "volunteers") &&
           volunteers.map((v) =>
-            v.latitude && v.longitude ? (
+            v.latitude !== null && v.longitude !== null ? (
               <Marker key={v.id} position={[v.latitude, v.longitude]} icon={volunteerIcon}>
                 <Popup>
                   <strong>{v.userName}</strong>
@@ -188,7 +292,12 @@ export default function MapView() {
                   <strong className="text-sos">🚨 SOS Alert</strong>
                   <br />
                   <span className="text-sm">From: {s.userName}</span>
-                  <br />
+                  {typeof s.distanceKm === "number" && (
+                    <>
+                      <br />
+                      <span className="text-xs text-muted-foreground">Distance: {s.distanceKm.toFixed(1)} km</span>
+                    </>
+                  )}
                   <Button size="sm" onClick={() => acceptSOS(s)} className="w-full mt-2 gap-1">
                     <Navigation className="h-3 w-3" /> Accept & Navigate
                   </Button>

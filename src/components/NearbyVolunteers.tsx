@@ -104,10 +104,8 @@ export function NearbyVolunteers({ sosId, userLat, userLng, open, onClose, onRes
 
     const profileMap = new Map(profiles?.map((p) => [p.id, p]) || []);
 
-    const MAX_RADIUS_KM = 50; // Show volunteers within 50km radius
-
     const nearby = vols
-      .filter((v) => v.latitude && v.longitude && v.user_id !== user?.id)
+      .filter((v) => v.latitude !== null && v.longitude !== null && v.user_id !== user?.id)
       .map((v) => {
         const profile = profileMap.get(v.user_id);
         return {
@@ -123,7 +121,6 @@ export function NearbyVolunteers({ sosId, userLat, userLng, open, onClose, onRes
           distance: getDistanceKm(userLat, userLng, v.latitude!, v.longitude!),
         };
       })
-      .filter((v) => v.distance <= MAX_RADIUS_KM)
       .sort((a, b) => a.distance - b.distance)
       .slice(0, 10);
 
@@ -199,7 +196,7 @@ export function NearbyVolunteers({ sosId, userLat, userLng, open, onClose, onRes
                         <MapPin className="h-3 w-3" /> {v.distance.toFixed(1)} km
                       </span>
                       <span className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Star className="h-3 w-3 text-yellow-500" /> {v.incentive_score}
+                        <Star className="h-3 w-3 text-warning" /> {v.incentive_score}
                       </span>
                     </div>
                   </div>
