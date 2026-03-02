@@ -24,6 +24,7 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [userType, setUserType] = useState<"user" | "volunteer">("user");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const navigate = useNavigate();
@@ -34,15 +35,24 @@ export default function Auth() {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error, data } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        // Check if user signed up as volunteer but hasn't submitted application yet
+        const userType = data.user?.user_metadata?.user_type;
+        if (userType === "volunteer") {
+          const { data: volData } = await supabase.from("volunteers").select("id").eq("user_id", data.user.id).limit(1);
+          if (!volData || volData.length === 0) {
+            navigate("/volunteer-application");
+            return;
+          }
+        }
         navigate("/");
       } else {
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            data: { name },
+            data: { name, user_type: userType },
             emailRedirectTo: window.location.origin,
           },
         });
@@ -116,10 +126,40 @@ export default function Auth() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
-            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}>
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-4">
               <div className="relative">
                 <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} className="pl-10" required={!isLogin} />
+              </div>
+
+              {/* User Type Selection */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setUserType("user")}
+                  className={`p-3 rounded-xl border-2 text-center transition-all ${
+                    userType === "user"
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-card text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  <span className="text-2xl block mb-1">👤</span>
+                  <span className="text-sm font-medium">I'm a User</span>
+                  <p className="text-[10px] mt-0.5 opacity-70">Need emergency help</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUserType("volunteer")}
+                  className={`p-3 rounded-xl border-2 text-center transition-all ${
+                    userType === "volunteer"
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-card text-muted-foreground hover:border-primary/40"
+                  }`}
+                >
+                  <span className="text-2xl block mb-1">🩺</span>
+                  <span className="text-sm font-medium">I'm a Volunteer</span>
+                  <p className="text-[10px] mt-0.5 opacity-70">Medical professional</p>
+                </button>
               </div>
             </motion.div>
           )}
