@@ -33,6 +33,7 @@ interface NearbyVolunteersProps {
   userLng: number;
   open: boolean;
   onClose: () => void;
+  onResolved?: () => void;
 }
 
 function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -45,7 +46,7 @@ function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-export function NearbyVolunteers({ sosId, userLat, userLng, open, onClose }: NearbyVolunteersProps) {
+export function NearbyVolunteers({ sosId, userLat, userLng, open, onClose, onResolved }: NearbyVolunteersProps) {
   const { user } = useAuth();
   const [volunteers, setVolunteers] = useState<NearbyVolunteer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,6 +104,8 @@ export function NearbyVolunteers({ sosId, userLat, userLng, open, onClose }: Nea
 
     const profileMap = new Map(profiles?.map((p) => [p.id, p]) || []);
 
+    const MAX_RADIUS_KM = 5; // Only show volunteers within 5km radius
+
     const nearby = vols
       .filter((v) => v.latitude && v.longitude && v.user_id !== user?.id)
       .map((v) => {
@@ -120,6 +123,7 @@ export function NearbyVolunteers({ sosId, userLat, userLng, open, onClose }: Nea
           distance: getDistanceKm(userLat, userLng, v.latitude!, v.longitude!),
         };
       })
+      .filter((v) => v.distance <= MAX_RADIUS_KM) // Filter within radius
       .sort((a, b) => a.distance - b.distance)
       .slice(0, 10);
 
@@ -144,6 +148,7 @@ export function NearbyVolunteers({ sosId, userLat, userLng, open, onClose }: Nea
 
     toast({ title: "✅ Confirmed", description: "Thank you for confirming attendance." });
     setShowUserConfirm(false);
+    onResolved?.(); // Stop live location sharing
     onClose();
   };
 
@@ -156,7 +161,7 @@ export function NearbyVolunteers({ sosId, userLat, userLng, open, onClose }: Nea
               🚨 Nearby Medical Volunteers
             </DialogTitle>
             <DialogDescription>
-              Volunteers closest to your location are listed below. Tap to call them directly.
+              Medical volunteers within 5 km are listed below. Tap to call them directly. Your live location is being shared.
             </DialogDescription>
           </DialogHeader>
 

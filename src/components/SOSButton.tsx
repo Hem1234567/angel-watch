@@ -23,6 +23,35 @@ export function SOSButton() {
   const [showVolunteers, setShowVolunteers] = useState(false);
   const [sosId, setSosId] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [liveWatchId, setLiveWatchId] = useState<number | null>(null);
+
+  // Start continuous live location sharing to update SOS request coordinates
+  const startLiveLocationSharing = (requestId: string) => {
+    if (!navigator.geolocation) return;
+    const id = navigator.geolocation.watchPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setUserLocation({ lat, lng });
+        // Update SOS request with latest location so volunteer can track
+        await supabase
+          .from("sos_requests")
+          .update({ latitude: lat, longitude: lng })
+          .eq("id", requestId);
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+    );
+    setLiveWatchId(id);
+  };
+
+  // Stop live location sharing when SOS is resolved
+  const stopLiveLocation = () => {
+    if (liveWatchId !== null) {
+      navigator.geolocation.clearWatch(liveWatchId);
+      setLiveWatchId(null);
+    }
+  };
 
   const triggerSOS = async () => {
     if (!user || sending) return;
@@ -49,13 +78,15 @@ export function SOSButton() {
       setUserLocation({ lat, lng });
       setSosId(data.id);
 
+      // Start continuous live location updates
+      startLiveLocationSharing(data.id);
+
       toast({
         title: "🚨 SOS Sent!",
-        description: "Finding nearby medical volunteers...",
+        description: "Finding nearby medical volunteers... Live location sharing active.",
         variant: "destructive",
       });
 
-      // Show nearby volunteers instead of navigating to map
       setShowVolunteers(true);
     } catch (err: any) {
       toast({
@@ -66,6 +97,11 @@ export function SOSButton() {
     } finally {
       setSending(false);
     }
+  };
+
+  const handleClose = () => {
+    setShowVolunteers(false);
+    // Don't stop live location yet — keep it until attendance is confirmed
   };
 
   return (
@@ -109,7 +145,8 @@ export function SOSButton() {
           userLat={userLocation.lat}
           userLng={userLocation.lng}
           open={showVolunteers}
-          onClose={() => setShowVolunteers(false)}
+          onClose={handleClose}
+          onResolved={stopLiveLocation}
         />
       )}
     </div>
